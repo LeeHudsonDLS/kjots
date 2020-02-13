@@ -1,0 +1,1051 @@
+#######
+# Notes
+#######
+#######
+# Kjots
+#######
+Files are here:
+	/home/jjc62351/.kde/share/apps/kjots
+
+#################################
+# Creating support modules / IOCs
+#################################
+Create support module and use it:
+
+	set up areas:
+
+		Create a new module, call this in the area you want the support module to appear in:
+
+			dls-start-new-module.py -n BL99I
+
+		The -n doesn't commit it to SVN
+		This should be done in the support area
+
+		Create a new IOC, call this in the area you want it, ie, IOC:
+
+			dls-start-new-module.py -n -i -f BL99I/MO/01
+
+		The -i means IOC, the -f means full name. This will create and IO called BL99I-MO-IOC-01
+	
+	Get signal list:
+		
+		Copy a signal list to src folder of the support module
+		put: DATA += BL99ISignalList.xls into the makefile in the src directory
+
+	Get support modules:
+		
+		In the IOC folder add whatever support modules are required in the configure/RELEASE file.
+		This includes the Beamline support module
+
+		In the IOC folder /src change the Makefile to include all DBDs needed, any LIBS or 
+		srcs.
+	
+		Modify the Makefile in the Db folder to look something like:
+
+			TOP=../..
+			include $(TOP)/configure/CONFIG
+
+			DB += BL24I-MO-IOC-12.db
+			DB += limit_alarm.db
+
+			include $(TOP)/configure/RULES
+			#----------------------------------------
+			#  ADD RULES AFTER THIS LINE
+
+			BL24I-MO-IOC-12.substitutions: $(BL24I)/data/BL24ISignalList.xls
+				dls-python $(BLGUI)/data/dls-export-Db-files.py -n -u --ioc=BL24I-MO-IOC-12 $<
+				cat BL24I-MO-IOC-12*.substitutions.autogen > $@
+				-cat ../BL24I-MO-IOC-12*.substitutions >> $@
+
+			# to build autosave request files
+			BL24I-MO-IOC-12: ../O.Common/BL24I-MO-IOC-12.db
+				dls-python /dls_sw/prod/tools/RHEL6-x86_64/defaults/bin/epicsparser.py ../O.Common/BL24I-MO-IOC-12.db -r BL24I-MO-IOC-12 -s as > BL24I-MO-IOC-12
+				@echo "Installing postprocessor files"
+				-@$(INSTALL_PRODUCT) -d -m 555 *.req $(INSTALL_DATA)
+			buildInstall: BL24I-MO-IOC-12
+
+
+
+
+To make it a module rather than an IOC:
+
+src/Makefile
+	Replace PROD_IOC with LIBRARY_IOC
+	Remove xx_SRCS_DEFAULT and xx_SRCS_vxWorks
+	Remove xx_OBJS_vxWorks
+	
+
+###########################
+# Starting IOC on conserver
+###########################
+ssh to server, eg ssh i02-motion01
+bl02i-mo-serv-01
+ioc-list	-	this shows what IOCs are running
+
+
+
+
+	checkout /dls_sw/prod/etc/init
+
+	cd to i02-motion01, edit soft-iocs to add the ioc
+	Do special release:
+	dls-release.py -nta etc init
+
+	point configure-ioc e -a to the bin
+
+
+
+sudo /sbin/service epics-soft-iocs start BL02I-MO-IOC-07
+
+then:
+
+sudo /sbin/service epics-soft-iocs restart conserver.sh
+
+To get the procserv PVs initialised (CTRL button):
+sudo /sbin/service epics-soft-iocs restart autoProcServControl
+
+http://confluence.diamond.ac.uk/display/~tdq39642/Set+up+a+new+IOC+on+a+beamline+serverioc
+################
+# PMAC simulator
+################
+Pmac simulator:
+/dls_sw/work/R3.14.12.3/support/ajf67/pmacSimulation/runPmacSim
+
+##############
+# Motor Record
+##############
+Motor Stuff:
+
+Motor record screen:
+
+
+/dls_sw/prod/R3.14.12.3/support/motor/6-9dls1-1/motorApp/opi/edl
+
+command to open screen with macro:
+
+edm -x -m "motor=BL99I-OP-ATTN-01:DISC1" motor.edl &
+###########
+# Remote IO
+###########
+Ethercat runs on its own server, eg:
+
+BL02I-EA-RSERV-01
+
+
+ssh BL02I-EA-RSERV-01
+cd /dls_sw/work/R3.14.12.3/support/ethercat/bin/linux-x86_64
+./slaveinfo	//This shows all slaves connected.
+
+
+VMXi Specific:
+BL02I-EA-IOC-01		under builder
+################
+# Linux Commands
+################
+Re-run bashrc:
+	. ~/.bashrc
+
+
+
+edit bashrc
+	gedit .bashrc&
+
+
+
+
+Firefox locked:
+
+go to : /home/jjc62351/.mozilla/firefox/tln6dn28.default
+delete lock and .parentlock
+
+Replace through dir structure
+find . -type f | xargs sed -i 's/\$(prefix)/\$(P)/g'
+
+
+
+List installed packages:
+
+rpm -qa
+######
+# GREP
+######
+To find a string in a folder
+	grep -nr 'AXIS1:POSITION*' .
+		-n            Show relative line number in the file
+		'yourString*' String for search, followed by a wildcard character
+		-r            Recursively search subdirectories listed
+		.             Directory for search (current directory)
+
+
+#####
+# SVN
+#####
+To checkout a module using python script:
+
+dls-checkout-module.py -h (for help)
+dls-checkout-module.py [options] [<module_name>]
+
+eg
+dls-checkout-module.py -a SUPPORT smaract
+#########
+# Streams
+#########
+mo-ioc-03 for example of multiple streams:
+	epicsEnvSet("STREAM_PROTOCOL_PATH", "$(PMACUTIL)/data")
+	epicsEnvSet("STREAM_PROTOCOL_PATH", "$(STREAM_PROTOCOL_PATH):$(PMACCOORD)/data")
+
+
+
+
+Getting a PMAC variable via streams:
+	Look at BL04J-MO-IOC-02
+
+	Nozzle_Detection.db
+
+
+	record(ai, "BL04J-MO-MD2-01:BL_DIS_REQ")
+	{
+ 	 field(DESC, "Beamline Disable Request")
+ 	 field(DTYP, "stream")
+  	field(SCAN, "1 second")
+  	field(INP,  "@pmacCoord.proto getVar(M1027) PMAC_S0")
+	}
+
+
+Set pmac variable via streams:
+record(ao, "BL02I-MO-DMM-01:XSELECT")
+{
+  field(DESC, "Z band select")
+  field(DTYP, "stream")
+  field(VAL, "0")
+  field(OUT,  "@pmac.proto setVar(&3q21) BRICK_5")
+}
+
+
+
+
+Using local serial port:
+
+#drvAsynSerialPortConfigure("I400","/dev/ttyUSB0",0,0,0)
+#asynSetOption("I400", -1, "baud", "57600")
+#asynSetOption("I400", -1, "bits", "8")
+#asynSetOption("I400", -1, "parity", "none")
+#asynSetOption("I400", -1, "stop", "1")
+#asynSetOption("I400", -1, "clocal", "Y")
+#asynSetOption("I400", -1, "crtscts", "N")
+
+
+
+Using serial port via terminal server:
+
+drvAsynIPPortConfigure("laser_pointer", "172.23.226.203:7005", 0, 0, 0)
+
+#################
+# Terminal Server
+#################
+BL03I-NT-TSERV-01
+username: root, password:tslinux
+OR
+username: admin, password:tslinux
+
+########
+# Gensub
+########
+Must have:
+
+/src/
+	myroutine.c
+		epicsRegisterFunction(myroutine);
+	functions.dbd
+		function(myroutine)
+	Makefile
+		xx_DBD += functions.dbd
+		xx_SRCS += myroutine.c
+
+Reading PVs:
+
+debugMode = *(unsigned short *)prec->g;
+
+char cameraString[MAX_BC_LEN];
+strcpy(cameraString,prec->a);
+##########
+# Autosave
+##########
+#% autosave 1 VAL
+record(ai, "$(prefix)$(suffix):CONSTANT") {
+  field(DTYP, "Soft Channel")
+  field(PREC, "3")
+  field(VAL, "3.2")
+  field(PINI, "YES")
+}
+
+###########
+# Processes
+###########
+ps -ef	Lists processes
+
+
+###############
+# Shell Scripts
+###############
+Check kill a process and check that it's being run from the correct machine
+
+LIVE=pc0050.cs.diamond.ac.uk
+if [ $HOSTNAME = $LIVE ]
+then
+    kill -9 `pidof ./BL99I-MOTEST-IOC-01 stBL99I-MOTEST-IOC-01.boot`
+    cd /home/jjc62351/MotionTestIOC/BL99I/BL99I-MOTEST-gui/data
+    ./start.sh
+else
+    echo "Please run from $LIVE"
+fi
+#########
+# Smargon
+#########
+Secure copy:
+
+scp 12_Robot_Safe.plc root@172.23.104.173:"/var/ftp/usrflash/Project/PMAC\ Script\ Language/PLC\ Programs/12_Robot_Safe.plc"
+
+run projpp
+
+1111550
+############
+# Positioner
+############
+Real motor
+
+motorpositioner.template
+
+positioner.template
+####
+# nc
+####
+nc -w 1 -vnz 172.23.240.97 1024-1026
+nc -w 1 -vnz 172.23.240.88 9875-9877
+
+
+Scans for ports and lists open and closed ports
+
+##########
+# Mounting
+##########
+BL04I-EA-IOC-01
+LUT
+#################
+# Builder Release
+#################
+
+
+
+
+Commit the .xml and _RELEASE files in the builder module
+Do a release of the builder modue:
+	dls-release.py BL03I-BUILDER 2-16
+
+Do a merge and release:
+
+#Show diffs and don't commit
+dls-merge-iocs -d /dls_sw/prod/R3.14.12.3/support/BL03I-BUILDER/2-16/iocs/
+
+#For a new IOC use the -a flag
+dls-merge-iocs -a -c -m "" -r 1-1 /dls_sw/prod/R3.14.12.3/support/BL03I-BUILDER/2-16/iocs/
+
+#For a pre-existing IOC do below
+dls-merge-iocs -c -m "" -r 2017-Run4-2 /dls_sw/prod/R3.14.12.3/support/BL03I-BUILDER/2-21/iocs/
+
+################
+# New IOC in SVN
+################
+When in ioc directory,
+
+svn import BL03I-PY-IOC-01 $SVN_ROOT/…<path>…./ioc/BL03I/BL03I-PY-IOC-01 –m “my comment”
+
+(Now in repository but not under version control – need to checkout to be under version control)
+
+mv BL03I-PY-IOC-01 BL03I-PY-IOC-01_moved   (cannot checkout when original directory has the same name)
+
+svn co $SVN_ROOT/…../ioc/BL03I/BL03I-PY-IOC-01
+
+(Can now remove the BL03I-PY-IOC-01_moved directory)
+
+##########
+# Archiver
+##########
+Use read_arch.pl to tell the archiver what to archive and restart:
+
+read_arch.pl -h
+USAGE: /dls_sw/prod/tools/RHEL6-x86_64/defaults/bin/read_arch.pl [options]
+    -h                   : help
+    -v                   : verbose
+    -a Archiver Name     : Archiver Name
+                           e.g. VA,PC,RF,MP,RS,PS,DI,TI,FE,BURT,ID,BL and R79-VA
+    -f Group File        : EPICS Group File to read
+    -s Start Archiver (default N) : Input Y to Restart the archiver
+    -r Replace group file (default N) : Input Y to Replace existing group file 
+
+Reads an Group File and upload to RDB.
+
+read_arch.pl -a i03 -f /dls_sw/prod/R3.14.12.3/ioc/BL03I/BL/2017-Run5-2/data/BL03I.grp -s Y -r Y
+#########
+# Minicom
+#########
+do ^m ^j to add CR/LF
+
+
+####################
+# EPICS DB Templates
+####################
+########
+# Header
+########
+# <filename>
+# Lee Hudson
+#<Desc>
+
+# % macro, dom, Domain
+# % macro, brick, Geobrick (if less than 10 must be preceeded by 0)
+
+
+
+
+########################################################################
+###Takes the input from the GUI and sends it in decimal to the pmac#####
+########################################################################
+##########################
+# Long strings to Waveform
+##########################
+This allows long outputs for error messages
+
+record(aSub, BLTEST-LCH-01:GANTRY-SEQ-01) {
+  field(SNAM, "seqSelect")
+  field(INPG, "BLTEST-LCH-01:INPUT CP")
+  field(FTA, "USHORT")
+  field(FTB, "USHORT")
+  field(FTC, "USHORT")
+  field(FTD, "USHORT")
+  field(FTE, "USHORT")
+  field(FTF, "USHORT")
+  field(FTG, "USHORT")
+  field(FTH, "USHORT")
+  field(FTI, "USHORT")
+  field(FTJ, "USHORT")
+  field(FTK, "USHORT")
+  field(FTVA, "UCHAR")
+  field(OUTA, "BLTEST-LCH-01:CURRENT_STEP_MSG PP")
+  field(NOVA, "500")
+}
+
+record(waveform, BLTEST-LCH-01:CURRENT_STEP_MSG) {
+  field(NELM, "500")
+  field(FTVL, "UCHAR")
+}
+####################
+# Motor record on AO
+####################
+record(motor, "BL04I-OP-VFM-01:FPMTR")
+{
+  field(DTYP, "Soft Channel")
+  field(DIR,  "Pos")
+  field(VELO, "1")
+  field(VBAS, "0")
+  field(VMAX, "1")
+  field(BDST, "0")
+  field(BVEL, "0")
+  field(BACC, "0")
+  field(MRES, "0.0001")
+  field(RRES, "1")
+  field(URIP, "Yes")
+  field(PREC, "4")
+  field(EGU,  "mm")
+  field(DHLM, "0.032")
+  field(DLLM, "0")
+  field(HHSV, "MINOR")
+  field(LLSV, "MINOR")
+  field(DESC, "VFM Fine Pitch")
+  field(RDBL, "BL04I-OP-VFM-01:FPMTR:PREAD")
+  field(RTRY, "0")
+  field(DINP, "BL04I-OP-VFM-01:FPMTR:DONE")
+  field(NTM,  "NO")
+  field(OUT,  "BL04I-OP-VFM-01:FPMTR:DOMOVE PP")
+}
+
+record(ao, "BL04I-OP-VFM-01:FPMTR:DOMOVE") 
+{
+  field(DESC, "Do move")
+  field(DTYP, "Soft Channel")
+  field(SCAN, "Passive")
+  field(OMSL, "supervisory")
+  field(FLNK, "BL04I-OP-VFM-01:FPMTR:TIMER PP")
+}
+
+record(seq, "BL04I-OP-VFM-01:FPMTR:TIMER") 
+{
+  field(DOL1, "0")
+  field(LNK1, "BL04I-OP-VFM-01:FPMTR:DONE PP")
+  field(DOL2, "BL04I-OP-VFM-01:FPMTR.VAL")
+  field(LNK2, "BL04I-OP-VFM-01:FPMTR:POUT PP")
+  field(DLY3, "0.25")
+  field(DOL3, "1")
+  field(LNK3, "BL04I-OP-VFM-01:FPMTR:DONE PP")
+}
+
+record(bo, "BL04I-OP-VFM-01:FPMTR:DONE") 
+{
+  field(DTYP, "Soft Channel")
+  field(ZNAM, "Not done")
+  field(ONAM, "Done")
+}
+
+
+
+record(ai, "BL04I-OP-VFM-01:FPMTR:PREAD") 
+{
+  field(DESC, "Piezo readback")
+  field(PREC, "4")
+  field(EGU,  "mm")
+  field(DTYP, "Hy8401ip")
+  field(INP,  "#C70 S1 @")
+  field(LINR, "LINEAR")
+  field(EGUF, "0.032")
+  field(EGUL, "-0.032")
+  field(SCAN, ".1 second")
+  field(HIHI, "0.032")
+  field(LOLO, "0")
+  field(HHSV, "MINOR")
+  field(LLSV, "MINOR")
+}
+
+record(ao, "BL04I-OP-VFM-01:FPMTR:POUT") 
+{
+  field(DESC, "Send demand to motor")
+  field(PREC, "4")
+  field(EGU,  "mm")
+  field(DTYP, "Hy8402ao")
+  field(OUT,  "#C71 S1 @")
+  field(LINR, "LINEAR")
+  field(DRVH, "0.032")
+  field(DRVL, "0")
+  field(EGUF, "0.032")
+  field(EGUL, "-0.032")
+}
+
+record(seq, "BL04I-OP-VFM-01:FPMTR:PMOVE") 
+{
+  field(DESC, "move button")
+  field(DOL1, "BL04I-OP-VFM-01:FPMTR:PINP.VAL")
+  field(LNK1, "BL04I-OP-VFM-01:FPMTR:POUT PP")
+}
+
+record(calcout, "BL04I-OP-VFM-01:FPMTR:SPCLC") 
+{
+  field(DESC, "Soft limit")
+  field(CALC, "(A<B)||(A>C)?1:0")
+  field(INPA, "BL04I-OP-VFM-01:FPMTR:PREAD CP")
+  field(INPB, "BL04I-OP-VFM-01:FPMTR:LLVAL")
+  field(INPC, "BL04I-OP-VFM-01:FPMTR:HLVAL")
+  field(PREC, "4")
+}
+
+record(ao, "BL04I-OP-VFM-01:FPMTR:LLVAL") 
+{
+  field(VAL, "0")
+}
+
+record(ao, "BL04I-OP-VFM-01:FPMTR:HLVAL") 
+{
+  field(VAL, "0.032")
+}
+
+record(calcout, "BL04I-OP-VFM-01:FPMTR:TWL") 
+{
+  field(CALC, "B-A")
+  field(INPA, "BL04I-OP-VFM-01:FPMTR:RPOS.VAL")
+  field(INPB, "BL04I-OP-VFM-01:FPMTR:PINP")
+  field(OUT,  "BL04I-OP-VFM-01:FPMTR:POUT PP")
+  field(PREC, "4")
+}
+
+record(calcout, "BL04I-OP-VFM-01:FPMTR:TWR") 
+{
+  field(CALC, "A+B")
+  field(INPA, "BL04I-OP-VFM-01:FPMTR:RPOS.VAL")
+  field(INPB, "BL04I-OP-VFM-01:FPMTR:PINP")
+  field(OUT,  "BL04I-OP-VFM-01:FPMTR:POUT PP")
+  field(PREC, "4")
+}
+
+record(ao, "BL04I-OP-VFM-01:FPMTR:RPOS") 
+{
+  field(VAL,  "0.005")
+  field(PREC, "4")
+  field(EGU,  "mm")
+}
+
+record(ao, "BL04I-OP-VFM-01:FPMTR:UPDINP") 
+{
+  field(DESC, "Update INP")
+  field(OMSL, "closed_loop")
+  field(DOL,  "BL04I-OP-VFM-01:FPMTR:POUT CP")
+  field(OUT,  "BL04I-OP-VFM-01:FPMTR:PINP.VAL PP")
+}
+
+record(ao, "BL04I-OP-VFM-01:FPMTR:TO") 
+{
+  field(DESC, "To zero")
+  field(VAL,  "0")
+  field(OUT,  "BL04I-OP-VFM-01:FPMTR:POUT PP")
+}
+
+record(ao, "BL04I-OP-VFM-01:FPMTR:PINP") 
+{
+  field(DESC, "Demand value")
+  field(PREC, "4")
+  field(EGU,  "mm")
+  field(DRVH, "0.032")
+  field(DRVL, "0")
+  field(HIHI, "0.032")
+  field(LOLO, "0")
+  field(HHSV, "MINOR")
+  field(LLSV, "MINOR")
+}
+##########
+# Defaults
+##########
+  field(INP, "@asyn($(port), $(century)00, $(timeout=0)) FINS_DM_READ")
+########
+# loadDB
+########
+
+dbLoadRecords("db/TecReadTestHarness.db", "P=BL99I-EA-TEC-01, CONVERT=float32HEXtoDouble, FORMAT=DOUBLE, PARAM=TEMP")
+
+########
+# Smargo
+########
+#########
+# Changes
+#########
+STEP03:
+	PLC8_Interlock_Chain.pmc modified to check if powerpmac is safe / ready before outputting Sample XYZ ready.
+	PowerPmac is safe is still used in the same way with respect to passing the safe signal
+PMAC2:
+	PLC20 disabled and P2000 = 1 to override the original gonio in safe position
+PPMAC:
+	PLC11 needs to be enabled in the power pmac to enable FLU protection
+	PLC12 needs to be enabled
+	PLC12 modified to include Y,Z and Phi axes in sample position safe
+	PLC12 modified to pass through Geobrick 4 is safe
+
+BL04I-MO-IOC-03:
+	Kappa_Mode.db removed (not loaded)
+	Flu_Det_Protection.db Loaded 
+
+BL04I-MO-IOC-06:
+	Now running from home area due to permission issues:
+	/home/jjc62351/work/MX/BL04I_Smargon/BL04I/BL04I-MO-IOC-06
+
+BL04I-gui
+	BL module now looking in home area for BL04I-MO-IOC-06
+	Robot interlock page now has more fitting descriptions
+
+
+
+####################
+# Coordinate Systems
+####################
+###########
+# Structure
+###########
+; Set relevant axes to use kinematics
+&2#4->I
+&2#3->I
+
+
+Set up the P variables for EPICS to use. These depend on the axis number
+
+; Define resolution, offset, and move flag variables
+; These are set by motor_in_cs.template (from spreadsheet)
+#define X1MOVE P(4700+4)
+#define X1MRES P(4800+4)
+#define X1OFF  P(4900+4)
+#define X2MOVE P(4700+3)
+#define X2MRES P(4800+3)
+#define X2OFF  P(4900+3)
+
+
+
+P1-P8 needs to be used to refer to the lower level axis, define these for future use:
+
+#define X1		P4		(P4 for axis 4 etc)                
+#define X2		P3		                
+
+
+Infer the position of these axes in engineering units and wrt home:
+
+#define X1POS (X1MRES*X1+X1OFF)
+#define X2POS (X2MRES*X2+X2OFF)
+
+
+
+Define the coordinate system axes,ie, the higher level virtual axes. This uses the numbers for the new PMAC drive:
+
+#define X           Q6        ; Desired X
+#define Y           Q7        ; Desired Y 
+
+
+Do forward kinematics:
+
+OPEN FORWARD
+CLEAR
+        
+	X = 0.5*(X1POS + X2POS - E1 - E2 - 2 * X_OFFSET + PLATFORM_WIDTH)
+	Y = SQRT((LEG_LENGTH * LEG_LENGTH) - ((0.5 * (X2POS - X1POS + E1 - E2 + PLATFORM_WIDTH)) * (0.5 * (X2POS - X1POS + E1 - E2 + PLATFORM_WIDTH)))) + Y_OFFSET
+CLOSE
+
+
+Do inverse kinematics
+
+;Temp variables
+#define X1POS		Q232
+#define X2POS		Q233
+ 
+OPEN INVERSE
+CLEAR
+	
+	; X1 and X2 calculated in mm's
+	X1POS = X + X_OFFSET - SQRT((LEG_LENGTH * LEG_LENGTH) - ((Y-Y_OFFSET) * (Y-Y_OFFSET))) + E1 
+	X2POS = X - (PLATFORM_WIDTH - X_OFFSET) + SQRT((LEG_LENGTH * LEG_LENGTH) - ((Y-Y_OFFSET) * (Y-Y_OFFSET))) + E2
+
+	; X1 and X2 calculated in motor counts
+    	P4  = ((X1POS - X1OFF) / X1MRES)
+    	P3 = ((X2POS - X2OFF) / X2MRES)
+
+CLOSE
+
+
+
+Do a position reporting PLC
+
+; A PLC for position reporting
+#define X           Q86     ; Desired Y
+#define Y           Q87     ; Desired Y
+#define X1POS		(X1MRES*(m462/(I408*32))+X1OFF)
+#define X2POS		(X2MRES*(m362/(I308*32))+X2OFF)
+
+OPEN PLC 17
+CLEAR
+    ADDRESS&2
+    
+    X = 0.5*(X1POS + X2POS - E1 - E2 - 2 * X_OFFSET + PLATFORM_WIDTH)
+    Y = SQRT((LEG_LENGTH * LEG_LENGTH) - ((0.5 * (X2POS - X1POS + E1 - E2 + PLATFORM_WIDTH)) * (0.5 * (X2POS - X1POS + E1 - E2 + PLATFORM_WIDTH)))) + Y_OFFSET
+
+    ; If X1 or X2 motor records did the last move, set demands = readbacks
+    if (X1MOVE = 1)
+    or (X2MOVE = 1)
+        X1MOVE = 0
+        X2MOVE = 0
+        Q76 = Q86
+        Q77 = Q87
+    endif
+CLOSE
+
+############
+# Addressing
+############
+tpmac:
+	addr 6	=	Q7
+	addr 7	=	Q8
+	addr 8	=	Q9
+
+pmac
+	addr 6	=	Q6
+	addr 7	=	Q7
+	addr 8	=	Q8
+
+
+
+Example on BL02I-MO-IOC-07 / BL02I-MO-STEP-14 using pmac driver
+
+Gonio XY
+
+X	=	addr 6
+Y	=	addr 7
+
+X	=	Q6, Q86 and Q76
+Y	=	Q7, Q87 and Q77 
+
+######
+# VMXi
+######
+###############
+# DMM Positions
+###############
+-127039
+-12537
+-13430
+0
+1623377
+3880410
+-1240157
+-131970
+
+#########
+# Malcolm
+#########
+
+
+###########
+# C and C++
+###########
+###########
+# Compiling
+###########
+For C or C++:
+g++ test.c -o test
+
+
+Explicity for C:
+gcc test.c -o test
+#####################
+# String Manipulation
+#####################
+char * line = NULL;
+char * errorDesc;
+
+errorDesc = strchr(line,':');
+
+Copies whatever is in "line" to errorDesc from the point ':' is found. eg line = testing:string:stuff -> errorDesc = :string:stuff
+
+
+
+###################
+# Printf formatting
+###################
+Hex:
+
+The # part gives you a 0x in the output string. The 0 and the x count against your "8" characters listed in the 08 part. You need to ask for 10 characters if you want it to be the same. 
+int i = 7;
+
+printf("%#010x\n", i);  // gives 0x00000007
+printf("0x%08x\n", i);  // gives 0x00000007
+printf("%#08x\n", i);   // gives 0x000007
+Also changing the case of x, affects the casing of the outputted characters. 
+printf("%04x", 4779); // gives 12ab
+printf("%04X", 4779); // gives 12AB
+
+
+
+#########
+# Malcolm
+#########
+#########
+# Running
+#########
+BL02I-DI-IOC-04	-	Panda, mako
+BL02I-MO-IOC-10	-	Traj and motors
+
+
+To run :
+cd pymalcolm
+export PYTHONPATH=/dls_sw/work/common/python/cothread/
+
+
+./malcolm/imalcolm.py examples/BL02I-ML-MALC-01.yaml
+
+In the interpreter:
+
+In [1]: from scanpointgenerator import CompoundGenerator, LineGenerator
+
+In [2]: scan = self.block_view("BL02I-ML-SCAN-01")
+
+In [3]: gui(scan)
+
+In [4]: scan.configure(CompoundGenerator([LineGenerator(
+Display all 344 possibilities? (y or n)
+
+In [4]: scan.configure(CompoundGenerator([LineGenerator("gonioy", "mm", 0.0, 1.0, 10), LineGenerator("goniox", "mm", -0.5, 0.5, 20)], [], [], duration=0.5), fileDir="/tmp/")
+
+In [4]: scan.configure(CompoundGenerator([LineGenerator("gonioy", "mm", 0.0, 1.0, 10), LineGenerator("goniox", "mm", -0.5, 0.5, 20,alternate=True)], [], [], duration=0.5), fileDir="/tmp/")
+###########
+# Schematic
+###########
+In this example we created BL02I.blocks.hardware_scan_block and BL02I.blocks.brick22_manager_block. Other than that we used
+previously existing blocks.
+
+pymalcolm/malcolm/modules/BL02I/blocks
+	This is needed to create the blocks from the yaml file. Any yaml files created need to be in an init file.
+	__init__.py
+		from malcolm.yamlutil import make_block_creator, check_yaml_names
+
+		brick22_manager_block = make_block_creator(__file__, "brick22_manager_block.yaml")
+		hardware_scan_block = make_block_creator(__file__, "hardware_scan_block.yaml")
+
+		check_yaml_names(globals())
+.yaml structure:
+BL02I-ML-MALC-01.yaml
+	ADCore.blocks.detector_runnable_block
+	ADPandABlocks.blocks.pandablocks_runnable_block
+	BL02I.blocks.brick22_manager_block
+		scanning.controllers.RunnableController
+		pmac.includes.compoundmotor_collection 	(goniox)
+		pmac.includes.compoundmotor_collection	(gonioy)
+		pmac.includes.trajectory_collection		
+	BL02I.blocks.hardware_scan_block
+		scanning.controllers.RunnableController 	(axesToMove:[goniox,gonioy])
+		ADCore.parts.DatasetTablePart
+		scanning.parts.RunnableChildPart		
+		ADCore.parts.DatasetRunnableChildPart	
+		ADCore.parts.DatasetRunnableChildPart	
+	pva.blocks.pva_server_block
+	profiling.blocks.profiling_web_server_block
+
+######
+# Temp
+######
+#################
+# BL03I-MO-IOC-04
+#################
+commented FQCRBarcodeCamera.db in Db/Makefile
+commented functions.dbd in src/Makefile
+added BL03I-MO-IOC-04_DBD += FQCRBarcodeCamera.dbd in src/Makefile
+commented BL03I-MO-IOC-04_SRCS += barcodeConvert.c in src/Makefile
+added BL03I-MO-IOC-04_LIBS += FQCRBarcodeCamera in src/Makefile
+################
+# I03 Python IOC
+################
+Should run on i03-control
+Copy BL04I-XBPMFeedback.ed
+
+
+#######
+# BL03I
+#######
+############
+# James Bell
+############
+Use BL03I-EA-IOC-01?
+
+######
+# IOCs
+######
+BL03I-DI-IOC-02 ??
+BL03I-DI-IOC-03 ??
+
+##############
+# areaDetector
+##############
+####################
+# Creating Paramters
+####################
+#define SeiContrastString                "SEI_CONTRAST"
+
+
+
+	
+In constructor:
+	createParam(SeiContrastString,               asynParamInt32, &SeiContrast);
+
+
+in class definition:
+	protected:
+    		int SeiContrast;
+
+in the database:
+	record(longin, "$(P)$(R)SEI_CONT")
+	{
+    		field(DTYP, "asynInt32")
+    		field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SEI_CONTRAST")
+    		field(DESC, "Number of bad pixels")
+    		field(SCAN, "I/O Intr")
+	}
+
+#####
+# GIT
+#####
+##################
+# Modifying Module
+##################
+$GIT_ROOT = ssh://dascgitolite@dasc-git.diamond.ac.uk/controls
+eg
+$GIT_ROOT/support/ADPilatus
+
+Example dlsPLC:
+
+git clone dlsPLC
+	- Creates a clone of the module in the directory perfomed in
+
+git checkout -b asyn-version-update
+	- Creates a new branch for the modification
+
+Change files
+
+git add configure/RELEASE
+	- Stages this file for the next commit
+
+git commit -m "RELEASE changed to use new version of asyn"
+	- Commits change on local branch
+
+git checkout master
+	- switch back to the master branch
+
+git merge asyn-version-update --no -f
+	- Merge the new branch to master, --no -f keeps branching history
+
+git push origin master
+	- Push master to remote
+
+git tag 1-47
+	- Add a tag to mark that this current state is the state in which it will be released
+
+git push --tags
+	- Push tags to remote
+
+dls-release.py -g dlsPLC 1-47
+	- Do the release using git
+########
+# Course
+########
+git log --oneline
+	Shows all commits with hash id. Can be used to go back to old rev:
+(master) [jjc62351@diamtr341 paul1]$ git log --oneline
+fc3f86a Deleted File
+f9aa3b1 Third commit
+f936502 Second Commit
+d71f640 first commit
+(master) [jjc62351@diamtr341 paul1]$ git checkout d71f640
+
+
+
+
+git reflog
+
+
+terminal highlights:
+	git config --global color.ui auto
+
+
+(master) [jjc62351@diamtr341 myrepo]$ git cat-file -p 4b7fca6
+	shows the contents of the file with that hash id
+#######
+# Notes
+#######
+Checkout remote branch
+Before you can start working locally on a remote branch, you need to fetch it as called out in answers below. 
+To fetch a branch, you simply need to: 
+git fetch origin
+ 
+This will fetch all of the remote branches for you. You can see the branches available for checkout with: 
+git branch -v -a
+ 
+With the remote branches in hand, you now need to check out the branch you are interested in, giving you a local working copy: 
+git checkout -b test origin/test
+ 
+
+######
+# Trac
+######
+#######
+# Login
+#######
+jjc62351@fed.cclrc.ac.uk
+
+
